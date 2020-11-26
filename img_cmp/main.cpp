@@ -14,19 +14,20 @@
 								//#define 	STBIR_MAX_CHANNELS 3
 #define 	STBI_ONLY_PNG
 #define 	STBIR_ALPHA_CHANNEL_NONE -1
-#define 	PIXEL_PRINT
 
-static	int		validate_file(	std::string		*filename);
-static	int		load_image(		std::string		*filename,
+int		validate_file(	std::string		*filename);
+int		load_image(		std::string		*filename,
 								unsigned char	*rdata,
 								size_t			*rdata_size);
+int		rgb_to_hsl(		int r,int g, int b, float *h, float *s, float *l);
 
 //MARK: main -
 int main(int argc, const char *argv[]) {
-	std::string 			filenames[ARGS]	= {};
-	int						result[6]		= {0};
-	unsigned char 			*img_data	= NULL;
-	size_t					img_data_size = 0;
+	std::string 			filenames[ARGS]				= {"empty"};
+	int 					hist[ARGS][6][HISTS_POINTS]	= {0};
+	int						result[6]					= {0};
+
+
 
 	if ( --argc == ARGS )
 	{
@@ -49,15 +50,15 @@ int main(int argc, const char *argv[]) {
 	int fi = 0;
 	while (fi < ARGS)
 	{
-		img_data_size = IMG_MAX_XY_SIZE*IMG_MAX_XY_SIZE*CS_CHANELS;
-		img_data = new unsigned char [img_data_size];
+	size_t 			img_data_size = IMG_MAX_XY_SIZE*IMG_MAX_XY_SIZE*CS_CHANELS;
+	unsigned char 	*img_data = new unsigned char [img_data_size];
 		if(img_data == NULL)
 		{
 			std::cerr<<"fail to allocate "<<img_data_size
 			<<" byte of space for image data"<<std::endl;
 			return (2);
 		}
-		if(load_image(&filenames[fi++], img_data, &img_data_size))
+		if(load_image(&filenames[fi], img_data, &img_data_size))
 		{
 			delete [] img_data;
 			std::cerr<<"Fail to load image: \""
@@ -65,20 +66,52 @@ int main(int argc, const char *argv[]) {
 			return (3);
 		}
 		//MARK:- iterating through pixel data
-		size_t pix_count = img_data_size/3;
+		size_t pix_count = img_data_size/CS_CHANELS;
 		unsigned char *img_data_start = img_data;
 		while (pix_count--)
 		{
 			int r = (int ) *img_data++;
 			int g = (int ) *img_data++;
 			int b = (int ) *img_data++;
-#ifdef PIXEL_PRINT
-				std::cout<<"pixel:\t"<<(img_data_size/3 - pix_count);
-				std::cout<<"\tr:\t"<<r<<"\tg:\t"<<g<<"\tb:\t"<<b<<std::endl;
-#endif
+			float h = .0f;
+			float s = .0f;
+			float l = .0f;
+			if(rgb_to_hsl(r,g,b,&h,&s,&l))
+				return (4);
+
+			int hi[6] = {	r/(256/HISTS_POINTS),
+							g/(256/HISTS_POINTS),
+							b/(256/HISTS_POINTS),
+							(int)(h/(360/HISTS_POINTS)),
+							(int)(s/(100/HISTS_POINTS)),
+							(int)(l/(100/HISTS_POINTS))};
+			hist[fi][0][hi[0]]++;
+			hist[fi][1][hi[1]]++;
+			hist[fi][2][hi[2]]++;
+			hist[fi][3][hi[3]]++;
+			hist[fi][4][hi[4]]++;
+			hist[fi][5][hi[5]]++;
 		}
 		//MARK: -
 		delete [] img_data_start;
+		fi++;
+	}
+
+	fi = 0;
+	int ci = 0;
+	while (fi < ARGS)
+	{
+		std::cout<<fi<<std::endl;
+		ci = 0;
+		while (ci < 6)
+		{
+		std::cout<<"["<<ci<<"]: ";
+			for (int histint:hist[fi][ci])
+				std::cout<<"\t\t"<<histint<<"\t\t";
+			std::cout<<std::endl;
+			ci++;
+		}
+		fi++;
 	}
 	std::cout<<"Result:";
 	for (int r : result)
@@ -87,7 +120,7 @@ int main(int argc, const char *argv[]) {
 	return(0);
 }
 
-static	int		validate_file(std::string *filename)
+int		validate_file(std::string *filename)
 {
 	std::ifstream file (*filename, std::ios::in);
 
@@ -100,7 +133,7 @@ static	int		validate_file(std::string *filename)
 	return (0);
 }
 
-static	int		load_image(	std::string		*filename,
+int		load_image(	std::string		*filename,
 							unsigned char	*rdata,
 							size_t			*rdata_size)
 {
@@ -116,6 +149,7 @@ static	int		load_image(	std::string		*filename,
 		size_t			data_size	= 0;
 
 //MARK:- load
+	std::cout<<"loading image file: \""<<*filename<<"\""<<std::endl;
 	data_ptr = stbi_load(filename->c_str(), &x, &y, &comp_f, comp_r);
 	if (data_ptr == NULL)
 	{
@@ -123,7 +157,7 @@ static	int		load_image(	std::string		*filename,
 		std::cerr<<"stbi error : "<< stbi_failure_reason() << std::endl;
 		return (1);
 	}
-	std::cout<<"image dimensions are :"<<x<<"x"<<y<<std::endl;
+	std::cout<<"image loaded! dimensions are :"<<x<<"x"<<y<<std::endl;
 	std::cout<<"its ben decoded by "<<comp_r<<" colors"<<std::endl;
 	data_size=x*y*comp_r;
 	std::cout<<"image data has : "<<data_size<<" bytes of memory"<<std::endl;
@@ -202,4 +236,40 @@ static	int		load_image(	std::string		*filename,
 
 	}
 	//MARK: -
+}
+
+int		rgb_to_hsl(int r,int g, int b, float *h, float *s, float *l)
+{
+	if((r == 0) & (g == 0) & (b == 0))
+	{
+		*h = .0;
+		*s = .0;
+		*l = .0;
+		return (0);
+	}
+	if ((r < 0)|(r > 255)|(g < 0)|(g > 255)|(b < 0)|(b > 255))
+	{
+		std::cerr<<"corrupted data:\nr:\t"<<r<<"\tg:\t"<<g<<"\tb:\t"<<b<<std::endl;
+		return (1);
+	}
+	float	r_f			= r / 255.0;
+	float	g_f			= g / 255.0;
+	float	b_f			= b / 255.0;
+	float	rgb_min 	= std::min(std::min(r,g),b);
+	float 	rgb_max 	= std::max(std::max(r,g),b);
+	float	rgb_min_f	= rgb_min / 255.0;
+	float	rgb_max_f	= rgb_max / 255.0;
+	float	maxSmin		= rgb_max_f - rgb_min_f;
+	float 	h_m1	 	= (60 * (maxSmin != 0))/(maxSmin + (maxSmin == 0));
+	float 	h_m2		= (g_f-b_f)*(r == rgb_max) + (b_f-r_f)*(g == rgb_max) + (r_f-g_f)*(r != rgb_max)*(g != rgb_max);
+	float 	h_m3		= 360 *(r == rgb_max) + 120 *(g == rgb_max) + 240 *(r != rgb_max)*(g != rgb_max);
+	float	h_m4		= (r == rgb_max)*360*(((h_m1 * h_m2) + h_m3) >= 360);
+	float	s_m1		= .5 * (rgb_max_f + rgb_min_f);
+	float	s_m2		= (s_m1 > .5) *  2.0;
+	float	s_m3		= (-1)*(s_m1 > .5) * (2.0 * s_m1) + (s_m1 <= .5) * (2.0 * s_m1);
+
+	*h 		= ((h_m1 * h_m2) + h_m3) - h_m4;
+	*s 		= (maxSmin/(s_m2 + s_m3)) * 100;
+	*l 		= ((rgb_max_f + rgb_min_f)/2) * 100;
+	return (0);
 }
