@@ -14,14 +14,14 @@
 								//#define 	STBIR_MAX_CHANNELS 3
 #define 	STBI_ONLY_PNG
 #define 	STBIR_ALPHA_CHANNEL_NONE -1
-
+#define 	PIXEL_PRINT
 
 static	int		validate_file(	std::string		*filename);
 static	int		load_image(		std::string		*filename,
 								unsigned char	*rdata,
 								size_t			*rdata_size);
 
-
+//MARK: main -
 int main(int argc, const char *argv[]) {
 	std::string 			filenames[ARGS]	= {};
 	int						result[6]		= {0};
@@ -46,7 +46,6 @@ int main(int argc, const char *argv[]) {
 				return (1);
 		}
 	}
-
 	int fi = 0;
 	while (fi < ARGS)
 	{
@@ -65,7 +64,21 @@ int main(int argc, const char *argv[]) {
 				<<filenames[--fi]<<"\""<<std::endl;
 			return (3);
 		}
-		delete [] img_data;
+		//MARK:- iterating through pixel data
+		size_t pix_count = img_data_size/3;
+		unsigned char *img_data_start = img_data;
+		while (pix_count--)
+		{
+			int r = (int ) *img_data++;
+			int g = (int ) *img_data++;
+			int b = (int ) *img_data++;
+#ifdef PIXEL_PRINT
+				std::cout<<"pixel:\t"<<(img_data_size/3 - pix_count);
+				std::cout<<"\tr:\t"<<r<<"\tg:\t"<<g<<"\tb:\t"<<b<<std::endl;
+#endif
+		}
+		//MARK: -
+		delete [] img_data_start;
 	}
 	std::cout<<"Result:";
 	for (int r : result)
@@ -119,6 +132,7 @@ static	int		load_image(	std::string		*filename,
 	{
 		if (data_size <= *rdata_size)
 		{
+			*rdata_size = data_size;
 			std::memcpy(rdata, data_ptr, data_size);
 			stbi_image_free(data_ptr);
 			return (0);
@@ -162,6 +176,7 @@ static	int		load_image(	std::string		*filename,
 		{
 			if (data_size <= *rdata_size)
 			{
+				*rdata_size = data_size;
 				std::memcpy(rdata, data_ptr2, data_size);
 				std::cout<<"new image size is :"<< x2 <<"x"<<y2<<std::endl;
 				std::cout<<"new image data has : "<<data_size<<" bytes of memory"<<std::endl;
