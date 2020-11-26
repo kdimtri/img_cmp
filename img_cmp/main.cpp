@@ -37,7 +37,8 @@ int main(int argc, const char * argv[]) {
 			filenames[argc] = argv[argc + 1];
 	else
 	{
-		std::cerr<<"Wrong number of arguments: "<<(argc - 1)<<std::endl;
+		if(argc)
+			std::cerr<<"Wrong number of arguments: "<<(argc)<<std::endl;
 		int i(0);
 		while (i < ARGS)
 		{
@@ -58,7 +59,7 @@ int main(int argc, const char * argv[]) {
 		data_ptr = stbi_load(filename.c_str(), &x, &y, &comp_ff, comp_r);
 		if (data_ptr != NULL)
 		{
-			std::cout<<"Image size is :"<<x<<"x"<<y<<std::endl;
+			std::cout<<"image dimensions are :"<<x<<"x"<<y<<std::endl;
 			std::cout<<"its ben decoded by "<<comp_r<<" colors"<<std::endl;
 			xy_max=std::max(x,y);
 			if (xy_max>IMG_MAX_XY_SIZE)
@@ -85,18 +86,25 @@ int main(int argc, const char * argv[]) {
 					}
 					else
 					{
+						stbi_image_free(data_ptr);
+						delete [] data_ptr2;
 						std::cerr<<"fail to resize image file: \""<<filename<<"\""<<std::endl;
 						return (-2);
 					}
 				}
 				else
 				{
+					stbi_image_free(data_ptr);
 					std::cerr<<"fail to allocate memory to scale image"<<std::endl;
 					return (-2);
 				}
 			}
+			else
+			{
+				stbi_image_free(data_ptr);
+			}
 		}
-		else
+		else //data_ptr == NULL
 		{
 			std::cerr<<"Unable to decode file: \""<<filename<<"\""<<std::endl;
 			std::cerr<<"stbi error : "<< stbi_failure_reason() << std::endl;
